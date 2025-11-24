@@ -22,9 +22,9 @@ function App() {
     <>
       <header className="flex flex-col items-center gap-2">
         <h1 className="font-bold text-6xl text-gray-700">Letterboxd Neighbour</h1>
-        <p className="font-bold">Measure film taste between two Letterboxd users.</p>
+        <p className="text-xl">Measure film taste between two Letterboxd users.</p>
       </header>
-      
+
       <section className="mt-6 gap-2 flex flex-col items-center w-full">
         <Input placeholder="Username 1" className="w-1/2" onChange={
           (e) => setUser1(e.target.value)
