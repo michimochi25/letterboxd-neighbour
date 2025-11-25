@@ -8,6 +8,13 @@ import { StackedBar } from "./components/StackedBar";
 import { cn } from "./lib/utils";
 import type { Data } from "./types";
 import { DisagreeRow } from "./components/DisagreeRow";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { DialogFooter, DialogHeader } from "./components/ui/dialog";
 
 function App() {
   const [user1, setUser1] = useState<string>("");
@@ -166,27 +173,41 @@ function App() {
             </div>
 
             {/* How score is calculated info */}
-            <div className="w-full max-w-2xl p-4 rounded-lg shadow-sm border border-gray-100">
-              <h1 className="font-bold text-2xl mb-2 text-center">
-                How is the score calculated?
-              </h1>
-              <p>
-                The overall score is a weighted average of two main metrics:
-              </p>
-              <ul className="list-disc list-inside mt-2">
-                <li>
-                  <strong>Taste Match (70% weight):</strong> This measures how
-                  similarly you rate the same movies. A higher percentage means
-                  you both tend to agree on movie ratings.
-                </li>
-                <li>
-                  <strong>Library Overlap (30% weight):</strong> This measures
-                  how many movies you have both watched compared to your total
-                  watched movies. A higher percentage means you have more common
-                  movies in your libraries.
-                </li>
-              </ul>
-            </div>
+            <Dialog>
+              <DialogTrigger asChild>
+                <span className="underline cursor-pointer text-center">
+                  How is the score calculated?
+                </span>
+              </DialogTrigger>
+              <DialogContent className="flex flex-col justify-center items-center">
+                <DialogHeader>
+                  <h1 className="text-2xl font-bold">
+                    How is the score calculated?
+                  </h1>
+                </DialogHeader>
+                <p>
+                  The overall score is a weighted average of two main metrics:
+                </p>
+                <ul className="flex flex-col max-w-102 mt-2">
+                  <li>
+                    <strong>Taste Match (70% weight):</strong> This measures how
+                    similarly you rate the same movies. A higher percentage
+                    means you both tend to agree on movie ratings.
+                  </li>
+                  <li>
+                    <strong>Library Overlap (30% weight):</strong> This measures
+                    how many movies you have both watched compared to your total
+                    watched movies. A higher percentage means you have more
+                    common movies in your libraries.
+                  </li>
+                </ul>
+                <DialogFooter>
+                  <DialogClose asChild>
+                    <Button variant="outline">Close</Button>
+                  </DialogClose>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
 
             <div className="w-full flex justify-center flex-col items-center">
               <h1 className="font-bold text-2xl mb-2">Common Movies</h1>
