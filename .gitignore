@@ -3,7 +3,7 @@ env/
 .env
 .venv/
 be-venv/
-
+.vscode/
 __pycache__/
 
 

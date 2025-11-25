@@ -9,6 +9,8 @@ from typing import Dict
 import math
 import pandas as pd
 from scipy.stats import pearsonr
+import json
+import requests
 
 MAX_CONCURRENT_REQUESTS = 5
 app = FastAPI()
@@ -82,7 +84,7 @@ async def fetch_page(client: httpx.AsyncClient, username: str, page: int, semaph
                 if rating_span:
                     match = re.search(r"rated-([0-9]+)", rating_span["class"][-1])
                     rating = int(match.group(1)) / 2.0 if match else 0
-                
+                    
                 films.append({"title": film_title, "slug": slug, "rating": rating})
     else:
         print("No posters found on this page.")
@@ -118,10 +120,25 @@ async def scrape_user(username: str) -> UserData:
             ratings_map[film["slug"]] = film["rating"]
             details_map[film["slug"]] = {
                 "title": film["title"],
-                "rating": film["rating"]
+                "rating": film["rating"],
             }
         
         return UserData(username=username, ratings=ratings_map, movie_details=details_map)
+
+def scrape_poster(slug: str) -> str:
+    url = f"https://letterboxd.com/film/{slug}/"
+
+    r = requests.get(url)
+    soup = BeautifulSoup(r.text, 'html.parser')
+
+    script_w_data = soup.select_one('script[type="application/ld+json"]')
+    if script_w_data:
+        json_obj = json.loads(script_w_data.text.split(' */')[1].split('/* ]]>')[0])
+        return json_obj['image']
+
+    print(f"Poster not found for slug: {slug}\n{script_w_data}")
+    return ""
+    
 
 # Compare
 def calculate_similarity(u1: UserData, u2: UserData):
@@ -154,7 +171,8 @@ def calculate_similarity(u1: UserData, u2: UserData):
 
     # Calculate disagreements
     df['diff'] = (df['u1'] - df['u2']).abs()
-    top_diff = df.sort_values('diff', ascending=False).head(5)
+    sorted_df = df.sort_values('diff', ascending=False)
+    top_diff = sorted_df.head(5)
     disagreements = []
     for slug, row in top_diff.iterrows():
         # Retrieve title from u1's details map
@@ -162,10 +180,24 @@ def calculate_similarity(u1: UserData, u2: UserData):
         disagreements.append({
             "slug": slug,
             "title": title,
+            "poster": scrape_poster(slug),
             "u1Rating": row['u1'],
             "u2Rating": row['u2'],
         })
-        
+    
+    # agreements = []
+    # bot_diff = sorted_df.tail(5)
+    # for slug, row in bot_diff.iterrows():
+    #     # Retrieve title from u1's details map
+    #     title = u1.movie_details.get(slug, {}).get('title', slug)
+    #     agreements.append({
+    #         "slug": slug,
+    #         "title": title,
+    #         "poster": scrape_poster(slug),
+    #         "u1Rating": row['u1'],
+    #         "u2Rating": row['u2'],
+    #     })
+    
     final_score = (normalized_taste * 0.7) + (jaccard * 0.3)
 
     return {
@@ -178,6 +210,7 @@ def calculate_similarity(u1: UserData, u2: UserData):
             "totalWatched": [len(u1.ratings), len(u2.ratings)]
         },
         "controversialMovies": disagreements,
+        # "agreeableMovies": agreements
     }
 
 @app.post("/api/compare")

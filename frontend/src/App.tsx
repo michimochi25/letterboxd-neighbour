@@ -13,8 +13,9 @@ import {
   DialogClose,
   DialogContent,
   DialogTrigger,
+  DialogFooter,
+  DialogHeader,
 } from "@/components/ui/dialog";
-import { DialogFooter, DialogHeader } from "./components/ui/dialog";
 
 function App() {
   const [user1, setUser1] = useState<string>("");
@@ -179,7 +180,7 @@ function App() {
                   How is the score calculated?
                 </span>
               </DialogTrigger>
-              <DialogContent className="flex flex-col justify-center items-center">
+              <DialogContent className="flex flex-col justify-center items-center text-black">
                 <DialogHeader>
                   <h1 className="text-2xl font-bold">
                     How is the score calculated?
@@ -188,7 +189,7 @@ function App() {
                 <p>
                   The overall score is a weighted average of two main metrics:
                 </p>
-                <ul className="flex flex-col max-w-102 mt-2">
+                <ul className="flex flex-col max-w-102 mt-2 gap-2">
                   <li>
                     <strong>Taste Match (70% weight):</strong> This measures how
                     similarly you rate the same movies. A higher percentage
@@ -234,10 +235,10 @@ function App() {
               />
             </div>
 
-            {/* Top 3 Disagreement */}
+            {/* Top 5 Disagreement */}
             <div className="w-full max-w-2xl p-4 space-y-4 rounded-lg shadow-sm border border-gray-100">
               <h1 className="font-bold text-2xl mb-4 text-center">
-                Top 3 Disagreements
+                Top 5 Disagreements
               </h1>
               {data.controversialMovies.length > 0 && (
                 <>
@@ -262,9 +263,9 @@ function App() {
                     return (
                       <DisagreeRow
                         key={index}
-                        title={movie.title}
-                        u1Rating={movie.u1Rating}
-                        u2Rating={movie.u2Rating}
+                        movieDiff={movie}
+                        user1={data.users[0]}
+                        user2={data.users[1]}
                       />
                     );
                   })}
@@ -277,6 +278,49 @@ function App() {
                 </p>
               )}
             </div>
+
+            {/* Top 5 Agreement */}
+            {/* <div className="w-full max-w-2xl p-4 space-y-4 rounded-lg shadow-sm border border-gray-100">
+              <h1 className="font-bold text-2xl mb-4 text-center">
+                Top 5 Agreement
+              </h1>
+              {data.agreeableMovies.length > 0 && (
+                <>
+                  <div className="w-full grid grid-cols-3 justify-items-center items-center gap-4 p-2 border-b border-gray-200">
+                    <span className="font-bold">Movie</span>
+                    <a
+                      href={`https://letterboxd.com/${data.users[0]}`}
+                      target="_blank"
+                      className="font-bold"
+                    >
+                      {data.users[0]}'s Rating
+                    </a>
+                    <a
+                      href={`https://letterboxd.com/${data.users[1]}`}
+                      target="_blank"
+                      className="font-bold"
+                    >
+                      {data.users[1]}'s Rating
+                    </a>
+                  </div>
+                  {data.agreeableMovies.map((movie, index) => {
+                    return (
+                      <DisagreeRow
+                        key={index}
+                        movieDiff={movie}
+                        user1={data.users[0]}
+                        user2={data.users[1]}
+                      />
+                    );
+                  })}
+                </>
+              )}
+              {data.agreeableMovies.length === 0 && (
+                <p className="text-center">
+                  You two can't seem to agree on any movies!
+                </p>
+              )}
+            </div> */}
           </div>
         )}
       </section>
