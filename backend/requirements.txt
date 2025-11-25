@@ -1,0 +1,6 @@
+fastapi[standard]
+uvicorn
+httpx
+beautifulsoup4
+numpy
+pydantic
