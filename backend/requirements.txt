@@ -3,4 +3,6 @@ uvicorn
 httpx
 beautifulsoup4
 numpy
+scipy
 pydantic
+pandas

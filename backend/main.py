@@ -5,8 +5,9 @@ from pydantic import BaseModel
 import httpx
 from bs4 import BeautifulSoup
 import re
-from typing import List, Dict, Optional
+from typing import Dict
 import math
+import pandas as pd
 
 MAX_CONCURRENT_REQUESTS = 5
 app = FastAPI()
@@ -74,13 +75,14 @@ async def fetch_page(client: httpx.AsyncClient, username: str, page: int, semaph
                 film_title = film_div.get("data-item-name")
                 slug = film_div.get("data-item-slug")
                 
-            # Get rating
-            rating_span = li.find("span", class_="rating")
-            rating: float = 0
-            if rating_span:
-                match = re.search(r"rated-([0-9])", rating_span["class"][-1])
-                rating = int(match.group(1)) / 2.0 if match else 0
-            films.append({"title": film_title, "slug": slug, "rating": rating})
+                # Get rating
+                rating_span = li.find("span", class_="rating")
+                rating: float = 0
+                if rating_span:
+                    match = re.search(r"rated-([0-9]+)", rating_span["class"][-1])
+                    rating = int(match.group(1)) / 2.0 if match else 0
+                
+                films.append({"title": film_title, "slug": slug, "rating": rating})
     else:
         print("No posters found on this page.")
     return {"films": films, "total_pages": total_pages}
@@ -122,6 +124,7 @@ async def scrape_user(username: str) -> UserData:
 
 # Compare
 def calculate_similarity(u1: UserData, u2: UserData):
+    df1 = pd.DataFrame(u1)
     shared_slugs = set(u1.ratings.keys()) & set(u2.ratings.keys())        
     union_slugs = set(u1.ratings.keys()) | set(u2.ratings.keys())
     jaccard = len(shared_slugs) / len(union_slugs) if union_slugs else 0
@@ -139,12 +142,12 @@ def calculate_similarity(u1: UserData, u2: UserData):
 
     disagreements = []
     for slug in shared_slugs:
-        if u2.ratings[slug] < 0.5 or u1.ratings[slug] < 0.5:
+        if u2.ratings[slug] == 0 or u1.ratings[slug] == 0:
             # ignore unrated films
             continue
         
         diff = abs(u1.ratings[slug] - u2.ratings[slug])
-        if diff >= 2.0:
+        if diff >= 1.0:
             disagreements.append({
                 "title": u1.movie_details[slug]["title"],
                 "u1Rating": u1.ratings[slug],
@@ -183,7 +186,6 @@ async def compare_users(request: CompareRequest):
         raise HTTPException(status_code=400, detail="Not enough data found.")
 
     return calculate_similarity(u1_data, u2_data)
-
 
 if __name__ == "__main__":
     import uvicorn
