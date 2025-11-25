@@ -8,6 +8,7 @@ import re
 from typing import Dict
 import math
 import pandas as pd
+from scipy.stats import pearsonr
 
 MAX_CONCURRENT_REQUESTS = 5
 app = FastAPI()
@@ -124,39 +125,49 @@ async def scrape_user(username: str) -> UserData:
 
 # Compare
 def calculate_similarity(u1: UserData, u2: UserData):
-    df1 = pd.DataFrame(u1)
+    # Jaccard Index
     shared_slugs = set(u1.ratings.keys()) & set(u2.ratings.keys())        
     union_slugs = set(u1.ratings.keys()) | set(u2.ratings.keys())
     jaccard = len(shared_slugs) / len(union_slugs) if union_slugs else 0
     
-    if not shared_slugs:
-        cosine = 0
-    else:
-        rated_shared = [s for s in shared_slugs if u1.ratings[s] > 0 and u2.ratings[s] > 0]
-        v1 = [u1.ratings[s] for s in rated_shared]
-        v2 = [u2.ratings[s] for s in rated_shared]
-        dot_product = sum(a * b for a, b in zip(v1, v2))
-        mag1 = math.sqrt(sum(a**2 for a in v1))
-        mag2 = math.sqrt(sum(b**2 for b in v2))
-        cosine = dot_product / (mag1 * mag2) if (mag1 * mag2) > 0 else 0
+    # Pearson Correlation
+    s1 = pd.Series(u1.ratings, name="u1")
+    s2 = pd.Series(u2.ratings, name="u2")
+    df = pd.concat([s1, s2], axis=1, join='inner')
+    # Ignore unrated films
+    print("Before:", df.head())
+    df = df[(df['u1'] > 0) & (df['u2'] > 0)]
+    print("After:",df.head())
+    
+    shared_slugs = df.index.tolist()
+    raw_pearson = 0.0 
+    if len(df) >= 5:
+        # Pearson returns (correlation, p-value). We just want correlation.
+        # Handle case where variance is 0 (e.g. both users rated everything 5 stars)
+        if df['u1'].std() == 0 or df['u2'].std() == 0:
+             # If ratings are identical constants, perfect correlation (1.0)
+             # If constants differ, undefined, but let's call it neutral (0.0)
+            raw_pearson = 1.0 if df['u1'].mean() == df['u2'].mean() else 0.0
+        else:
+            raw_pearson, _ = pearsonr(df['u1'], df['u2'])
+            
+    # Normalize Pearson from [-1, 1] to [0, 1]
+    normalized_taste = (raw_pearson + 1) / 2
 
+    # Calculate disagreements
+    df['diff'] = (df['u1'] - df['u2']).abs()
+    top_diff = df.sort_values('diff', ascending=False).head(5)
     disagreements = []
-    for slug in shared_slugs:
-        if u2.ratings[slug] == 0 or u1.ratings[slug] == 0:
-            # ignore unrated films
-            continue
+    for slug, row in top_diff.iterrows():
+        # Retrieve title from u1's details map
+        title = u1.movie_details.get(slug, {}).get('title', slug)
+        disagreements.append({
+            "slug": slug,
+            "title": title,
+            "u1Rating": row['u1'],
+            "u2Rating": row['u2'],
+        })
         
-        diff = abs(u1.ratings[slug] - u2.ratings[slug])
-        if diff >= 1.0:
-            disagreements.append({
-                "title": u1.movie_details[slug]["title"],
-                "u1Rating": u1.ratings[slug],
-                "u2Rating": u2.ratings[slug],
-                "diff": diff
-            })
-    disagreements.sort(key=lambda x: x["diff"], reverse=True)
-
-    normalized_taste = (cosine + 1) / 2
     final_score = (normalized_taste * 0.7) + (jaccard * 0.3)
 
     return {
@@ -168,7 +179,7 @@ def calculate_similarity(u1: UserData, u2: UserData):
             "sharedCount": len(shared_slugs),
             "totalWatched": [len(u1.ratings), len(u2.ratings)]
         },
-        "controversialMovies": disagreements[:3],
+        "controversialMovies": disagreements,
     }
 
 @app.post("/api/compare")
