@@ -8,9 +8,9 @@ interface Metrics {
 
 export interface MovieDiff {
   title: string;
+  slug: string;
   u1Rating: number;
   u2Rating: number;
-  diff: number;
 }
 
 export interface Data {

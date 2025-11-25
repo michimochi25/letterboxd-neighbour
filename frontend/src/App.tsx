@@ -126,13 +126,37 @@ function App() {
                 </h2>
               </div>
               <div className="grid md:grid-rows-2 flex gap-3">
-                <Card className="w-full flex flex-col items-center gap-1">
+                <Card
+                  className={cn(
+                    "w-full flex flex-col items-center gap-1",
+                    // Percentage 0-30 -> orange
+                    data.metrics.tasteMatch <= 30 && "bg-[#ff8000]",
+                    // Percentage 31-60 -> green
+                    data.metrics.tasteMatch > 30 &&
+                      data.metrics.tasteMatch <= 60 &&
+                      "bg-[#00e054]",
+                    // Percentage 61-100 -> blue
+                    data.metrics.tasteMatch > 60 && "bg-[#40bcf4]"
+                  )}
+                >
                   <h1 className="font-bold text-xl">Taste Match</h1>
                   <h2 className="font-bold text-7xl text-(--primary)">
                     {data.metrics.tasteMatch}%
                   </h2>
                 </Card>
-                <Card className="w-full flex flex-col items-center gap-1">
+                <Card
+                  className={cn(
+                    "w-full flex flex-col items-center gap-1",
+                    // Percentage 0-30 -> orange
+                    data.metrics.libraryOverlap <= 30 && "bg-[#ff8000]",
+                    // Percentage 31-60 -> green
+                    data.metrics.libraryOverlap > 30 &&
+                      data.metrics.libraryOverlap <= 60 &&
+                      "bg-[#00e054]",
+                    // Percentage 61-100 -> blue
+                    data.metrics.libraryOverlap > 60 && "bg-[#40bcf4]"
+                  )}
+                >
                   <h1 className="font-bold text-xl">Library Overlap</h1>
                   <h2 className="font-bold text-7xl text-(--primary)">
                     {data.metrics.libraryOverlap}%

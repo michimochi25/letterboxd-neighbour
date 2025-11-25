@@ -135,9 +135,7 @@ def calculate_similarity(u1: UserData, u2: UserData):
     s2 = pd.Series(u2.ratings, name="u2")
     df = pd.concat([s1, s2], axis=1, join='inner')
     # Ignore unrated films
-    print("Before:", df.head())
     df = df[(df['u1'] > 0) & (df['u2'] > 0)]
-    print("After:",df.head())
     
     shared_slugs = df.index.tolist()
     raw_pearson = 0.0 
