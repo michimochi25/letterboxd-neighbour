@@ -165,6 +165,29 @@ function App() {
               </div>
             </div>
 
+            {/* How score is calculated info */}
+            <div className="w-full max-w-2xl p-4 rounded-lg shadow-sm border border-gray-100">
+              <h1 className="font-bold text-2xl mb-2 text-center">
+                How is the score calculated?
+              </h1>
+              <p>
+                The overall score is a weighted average of two main metrics:
+              </p>
+              <ul className="list-disc list-inside mt-2">
+                <li>
+                  <strong>Taste Match (70% weight):</strong> This measures how
+                  similarly you rate the same movies. A higher percentage means
+                  you both tend to agree on movie ratings.
+                </li>
+                <li>
+                  <strong>Library Overlap (30% weight):</strong> This measures
+                  how many movies you have both watched compared to your total
+                  watched movies. A higher percentage means you have more common
+                  movies in your libraries.
+                </li>
+              </ul>
+            </div>
+
             <div className="w-full flex justify-center flex-col items-center">
               <h1 className="font-bold text-2xl mb-2">Common Movies</h1>
               <StackedBar
