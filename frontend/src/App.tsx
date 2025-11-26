@@ -37,16 +37,19 @@ function App() {
     setLoading(true);
 
     try {
-      const response = await fetch("http://localhost:8000/api/compare", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          user1: user1,
-          user2: user2,
-        }),
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/compare`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            user1: user1,
+            user2: user2,
+          }),
+        }
+      );
 
       if (!response.ok) {
         const errorData = await response.json();
