@@ -65,5 +65,5 @@ pnpm dev
 - Deployment
 - Shared genre
 
-## License
+## 📄License
 This project is licensed under the MIT License - see the <a href="https://github.com/michimochi25/letterboxd-neighbour/blob/main/LICENSE">LICENSE<a> file for details.
