@@ -6,3 +6,4 @@ numpy
 scipy
 pydantic
 pandas
+requests
