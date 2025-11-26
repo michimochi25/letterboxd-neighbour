@@ -3,7 +3,7 @@ Measure film taste between two Letterboxd users.
 
 Letterboxd Neighbour is a high-performance Python tool that identifies your _cinematic soulmates_. It calculates compatibility based on library overlap and rating similarity, powered by an async scraper with Semaphore concurrency control for fast execution.
 
-## File Structure
+## 📂File Structure
 ```
 letterboxd-neighbour/
 ├── backend/
@@ -21,7 +21,7 @@ letterboxd-neighbour/
 └── README.md
 ```
 
-## Get Started
+## 🚀Get Started
 ### Prerequisites
 - **Python 3.10** or **3.11**
   - Adjust `requirements.txt` for older Python version
@@ -46,7 +46,7 @@ pip install -r requirements.txt
 cd frontend
 pnpm install 
 ```
-## Usage
+## 📖Usage
 Run both backend and frontend. 
 ```bash
 # Running backend
@@ -60,6 +60,10 @@ uvicorn main:app --reload
 cd frontend
 pnpm dev
 ```
+
+## ⌛Coming Soon
+- Deployment
+- Shared genre
 
 ## License
 This project is licensed under the MIT License - see the <a href="https://github.com/michimochi25/letterboxd-neighbour/blob/main/LICENSE">LICENSE<a> file for details.
