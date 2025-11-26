@@ -1,7 +1,7 @@
 # Letterboxd Neighbour
 Measure film taste between two Letterboxd users.
 
-Letterboxd Neighbour is a Python tool designed to help you discover "neighbours" on Letterboxd—users who share your movie taste, similar ratings, and watched films.
+Letterboxd Neighbour is a high-performance Python tool that identifies your _cinematic soulmates_. It calculates compatibility based on library overlap and rating similarity, powered by an async scraper with Semaphore concurrency control for fast execution.
 
 ## File Structure
 ```
