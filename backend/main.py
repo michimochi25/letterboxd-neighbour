@@ -229,6 +229,10 @@ async def compare_users(request: CompareRequest):
 
     return calculate_similarity(u1_data, u2_data)
 
+@app.get("/")
+def read_root():
+    return {"status": "ok"}
+
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8000)
