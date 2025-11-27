@@ -51,6 +51,10 @@ pip install -r requirements.txt
 cd frontend
 pnpm install 
 ```
+4. Add `.env` file in `frontend` folder
+```
+VITE_API_URL=http://localhost:8000
+```
 ## 📖Usage
 Run both backend and frontend. 
 ```bash
