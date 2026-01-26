@@ -1,18 +1,17 @@
+import asyncio
+import json
+from typing import Dict
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-import asyncio
 from pydantic import BaseModel
-import httpx
 from bs4 import BeautifulSoup
-import re
-from typing import Dict
-import math
 import pandas as pd
 from scipy.stats import pearsonr
-import json
-import requests
 
-MAX_CONCURRENT_REQUESTS = 5
+from curl_cffi.requests import AsyncSession
+
+MAX_CONCURRENT_REQUESTS = 3
 app = FastAPI()
 
 app.add_middleware(
@@ -31,23 +30,16 @@ class UserData(BaseModel):
     username: str
     ratings: Dict[str, float]
     movie_details: Dict[str, dict]
-    
-# Scraping
-async def fetch_page(client: httpx.AsyncClient, username: str, page: int, semaphore: asyncio.Semaphore) -> dict:
+
+async def fetch_page(session: AsyncSession, username: str, page: int, semaphore: asyncio.Semaphore) -> dict:
     url = f"https://letterboxd.com/{username}/films/page/{page}/"
     print(f"Fetching: {url}")
     
     async with semaphore:
         try:
-            headers = {
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
-                "Accept-Language": "en-US,en;q=0.5",
-                "Referer": "https://letterboxd.com/" 
-            }
-            response = await client.get(url, headers=headers, timeout=15.0)
-        except httpx.TimeoutException:
-            print(f"Timeout on page {page}")
+            response = await session.get(url, timeout=15.0)
+        except Exception as e:
+            print(f"Timeout or Error on page {page}: {e}")
             return {"films": [], "total_pages": 0}
         
     if response.status_code != 200:
@@ -82,32 +74,35 @@ async def fetch_page(client: httpx.AsyncClient, username: str, page: int, semaph
                 rating_span = li.find("span", class_="rating")
                 rating: float = 0
                 if rating_span:
-                    match = re.search(r"rated-([0-9]+)", rating_span["class"][-1])
-                    rating = int(match.group(1)) / 2.0 if match else 0
+                    # Class example: "rating rated-9" -> 9/2 = 4.5
+                    classes = rating_span.get("class", [])
+                    # Find the class that looks like rated-X
+                    for cls in classes:
+                        if cls.startswith("rated-"):
+                            try:
+                                rating_val = int(cls.split("-")[1])
+                                rating = rating_val / 2.0
+                            except (ValueError, IndexError):
+                                pass
+                            break
                     
                 films.append({"title": film_title, "slug": slug, "rating": rating})
-    else:
-        print("No posters found on this page.")
     return {"films": films, "total_pages": total_pages}
-    
+
 async def scrape_user(username: str) -> UserData:
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-    semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
-    
-    async with httpx.AsyncClient(headers=headers) as client:
-        first_page_data = await fetch_page(client, username, 1, semaphore)
+    async with AsyncSession(impersonate="chrome120") as session:
+        semaphore = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+        
+        # Fetch page 1 to get total pages
+        first_page_data = await fetch_page(session, username, 1, semaphore)
         
         films = first_page_data["films"]
         total_pages = first_page_data["total_pages"]
         
         if total_pages > 1:
-            # Limit to 50 pages max to prevent infinite loops or massive waits
-            limit = min(total_pages, 50) 
-            tasks = [fetch_page(client, username, i, semaphore) for i in range(2, limit + 1)]
+            limit = min(total_pages, 50)
+            tasks = [fetch_page(session, username, i, semaphore) for i in range(2, limit + 1)]
             
-            # Run all remaining tasks
             results = await asyncio.gather(*tasks)
             
             for res in results:
@@ -125,23 +120,37 @@ async def scrape_user(username: str) -> UserData:
         
         return UserData(username=username, ratings=ratings_map, movie_details=details_map)
 
-def scrape_poster(slug: str) -> str:
+async def scrape_poster(session: AsyncSession, slug: str) -> str:
+    """
+    Scrapes the poster image URL asynchronously.
+    """
     url = f"https://letterboxd.com/film/{slug}/"
-
-    r = requests.get(url)
-    soup = BeautifulSoup(r.text, 'html.parser')
-
-    script_w_data = soup.select_one('script[type="application/ld+json"]')
-    if script_w_data:
-        json_obj = json.loads(script_w_data.text.split(' */')[1].split('/* ]]>')[0])
-        return json_obj['image']
-
-    print(f"Poster not found for slug: {slug}\n{script_w_data}")
+    try:
+        r = await session.get(url, timeout=10.0)
+        if r.status_code != 200:
+            return ""
+            
+        soup = BeautifulSoup(r.text, 'html.parser')
+        
+        # Original logic preserved, but safer
+        script_w_data = soup.select_one('script[type="application/ld+json"]')
+        if script_w_data:
+            script_content = script_w_data.text
+            # Simple check if CDATA exists
+            if '*/' in script_content:
+                script_content = script_content.split(' */')[1]
+            if '/* ]]>' in script_content:
+                script_content = script_content.split('/* ]]>')[0]
+                
+            json_obj = json.loads(script_content)
+            return json_obj.get('image', "")
+            
+    except Exception as e:
+        print(f"Error fetching poster for {slug}: {e}")
+        
     return ""
-    
 
-# Compare
-def calculate_similarity(u1: UserData, u2: UserData):
+async def calculate_similarity(u1: UserData, u2: UserData):
     # Jaccard Index
     shared_slugs = set(u1.ratings.keys()) & set(u2.ratings.keys())        
     union_slugs = set(u1.ratings.keys()) | set(u2.ratings.keys())
@@ -151,53 +160,54 @@ def calculate_similarity(u1: UserData, u2: UserData):
     s1 = pd.Series(u1.ratings, name="u1")
     s2 = pd.Series(u2.ratings, name="u2")
     df = pd.concat([s1, s2], axis=1, join='inner')
-    # Ignore unrated films
+    
+    # Filter for movies both have seen
     df = df[(df['u1'] > 0) & (df['u2'] > 0)]
     
-    shared_slugs = df.index.tolist()
+    # shared_slugs updated to intersection of rated movies
+    shared_slugs_list = df.index.tolist()
+    
     raw_pearson = 0.0 
     if len(df) >= 5:
-        # Pearson returns (correlation, p-value). We just want correlation.
-        # Handle case where variance is 0 (e.g. both users rated everything 5 stars)
         if df['u1'].std() == 0 or df['u2'].std() == 0:
-             # If ratings are identical constants, perfect correlation (1.0)
-             # If constants differ, undefined, but let's call it neutral (0.0)
+            # If variance is 0 (all ratings identical), check if means match
             raw_pearson = 1.0 if df['u1'].mean() == df['u2'].mean() else 0.0
         else:
             raw_pearson, _ = pearsonr(df['u1'], df['u2'])
             
-    # Normalize Pearson from [-1, 1] to [0, 1]
     normalized_taste = (raw_pearson + 1) / 2
 
     # Calculate disagreements
     df['diff'] = (df['u1'] - df['u2']).abs()
     sorted_df = df.sort_values('diff', ascending=False)
     top_diff = sorted_df.head(5)
+    
+    # --- ASYNC POSTER FETCHING ---
+    # We create a temporary session to fetch all posters in parallel
     disagreements = []
-    for slug, row in top_diff.iterrows():
-        # Retrieve title from u1's details map
-        title = u1.movie_details.get(slug, {}).get('title', slug)
-        disagreements.append({
-            "slug": slug,
-            "title": title,
-            "poster": scrape_poster(slug),
-            "u1Rating": row['u1'],
-            "u2Rating": row['u2'],
-        })
     
-    # agreements = []
-    # bot_diff = sorted_df.tail(5)
-    # for slug, row in bot_diff.iterrows():
-    #     # Retrieve title from u1's details map
-    #     title = u1.movie_details.get(slug, {}).get('title', slug)
-    #     agreements.append({
-    #         "slug": slug,
-    #         "title": title,
-    #         "poster": scrape_poster(slug),
-    #         "u1Rating": row['u1'],
-    #         "u2Rating": row['u2'],
-    #     })
-    
+    async with AsyncSession(impersonate="chrome120") as poster_session:
+        poster_tasks = []
+        rows_data = [] # Keep track of data to recombine with poster result
+        
+        for slug, row in top_diff.iterrows():
+            rows_data.append((slug, row))
+            poster_tasks.append(scrape_poster(poster_session, str(slug)))
+            
+        # Fire all requests at once
+        poster_urls = await asyncio.gather(*poster_tasks)
+        
+        # Combine results
+        for (slug, row), poster_url in zip(rows_data, poster_urls):
+            title = u1.movie_details.get(slug, {}).get('title', slug)
+            disagreements.append({
+                "slug": slug,
+                "title": title,
+                "poster": poster_url,
+                "u1Rating": row['u1'],
+                "u2Rating": row['u2'],
+            })
+
     final_score = (normalized_taste * 0.7) + (jaccard * 0.3)
 
     return {
@@ -206,16 +216,16 @@ def calculate_similarity(u1: UserData, u2: UserData):
             "finalScore": round(final_score * 100),
             "tasteMatch": round(normalized_taste * 100),
             "libraryOverlap": round(jaccard * 100),
-            "sharedCount": len(shared_slugs),
+            "sharedCount": len(shared_slugs_list),
             "totalWatched": [len(u1.ratings), len(u2.ratings)]
         },
         "controversialMovies": disagreements,
-        # "agreeableMovies": agreements
     }
 
 @app.post("/api/compare")
 async def compare_users(request: CompareRequest):
     try:
+        # Fetch both users in parallel
         u1_data, u2_data = await asyncio.gather(
             scrape_user(request.user1),
             scrape_user(request.user2)
@@ -227,7 +237,8 @@ async def compare_users(request: CompareRequest):
     if not u1_data.ratings or not u2_data.ratings:
         raise HTTPException(status_code=400, detail="Not enough data found.")
 
-    return calculate_similarity(u1_data, u2_data)
+    # Await the calculation (since it now does async scraping for posters)
+    return await calculate_similarity(u1_data, u2_data)
 
 @app.get("/")
 def read_root():

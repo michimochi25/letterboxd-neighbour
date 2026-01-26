@@ -1,6 +1,7 @@
 fastapi[standard]
 uvicorn
 httpx
+curl_cffi
 beautifulsoup4
 numpy
 scipy
