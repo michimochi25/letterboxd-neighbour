@@ -16,6 +16,7 @@ export interface MovieDiff {
 
 export interface Data {
   users: string[];
+  warnings: string[];
   metrics: Metrics;
   controversialMovies: MovieDiff[];
   // agreeableMovies: MovieDiff[];

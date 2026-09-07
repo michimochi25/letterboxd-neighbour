@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Refer to @DESIGN.md for design decisions.
 
 ## Commands
 
@@ -32,13 +32,13 @@ Two independent processes: a FastAPI backend that scrapes Letterboxd and compute
 
 Whole request is one async pipeline, no database, no cache — every comparison re-scrapes both users from scratch, which is why the UI warns it may take a while.
 
-1. `scrape_user` fetches `letterboxd.com/{user}/films/page/1/`, parses the paginator to learn the page count, then fans out pages 2..N concurrently. Two hard limits matter: pages are capped at **50** and an `asyncio.Semaphore(MAX_CONCURRENT_REQUESTS = 3)` throttles in-flight requests. Raising the semaphore is what gets the scraper 403'd.
+1. `scrape_user` fetches `letterboxd.com/{user}/films/page/1/`, parses the paginator to learn the page count, then fans out pages 2..N concurrently. Two hard limits matter: pages are capped at `MAX_PAGES` (**50**) and one `asyncio.Semaphore(MAX_CONCURRENT_REQUESTS = 3)` — created in `compare_users` and threaded through both users' scrapes *and* the poster batch — throttles in-flight requests. Raising the semaphore, or giving any stage its own, is what gets the scraper 403'd.
 2. Requests go through `curl_cffi.AsyncSession(impersonate="chrome120")` rather than plain httpx — Letterboxd blocks default Python TLS fingerprints. This is load-bearing; the last commit was a 403 fix.
 3. Ratings are parsed out of the CSS class on the rating span (`rated-9` → 4.5). Films are keyed by Letterboxd **slug** throughout; an unrated film has rating `0`, which is also the "not rated" sentinel used to filter later.
 4. `calculate_similarity` computes Jaccard over all watched slugs, then Pearson over the inner join filtered to `rating > 0` on both sides. Pearson requires ≥5 shared rated films (else `0.0`) and has a zero-variance special case, since `pearsonr` is undefined there. Score is `0.7 * ((pearson + 1) / 2) + 0.3 * jaccard`, and the 70/30 split is also stated verbatim in the explainer dialog in `App.tsx` — keep them in sync.
-5. Poster URLs for the top-5 disagreements are scraped lazily, one film page each, in a second parallel batch, out of the `application/ld+json` script tag (CDATA wrappers stripped by string splitting).
+5. Poster URLs for the top-5 disagreements are scraped lazily, one film page each, in a second parallel batch (sharing the same semaphore), out of the `application/ld+json` script tag (CDATA wrappers stripped by string splitting).
 
-Failures are swallowed per-page and return empty film lists, so a partial scrape silently yields a low-confidence score rather than an error. CORS is wide open (`allow_origins=["*"]`).
+Page fetches retry `FETCH_ATTEMPTS` times with backoff, and 404 is never retried. A page that still fails raises `ScrapeIncomplete` → **502**, rather than scoring a short library; a 404 on page 1 raises `UserNotFound` → **404**. Truncation by `MAX_PAGES` is the one incompleteness that still returns a score, and the response's `warnings[]` says so. Error `detail` strings name the slot ("First"/"Second"), never the handle — `App.tsx` forwards `detail` to PostHog as `reason`, and that integration deliberately stores no Letterboxd usernames. CORS is wide open (`allow_origins=["*"]`).
 
 ### Frontend (`frontend/src/`)
 

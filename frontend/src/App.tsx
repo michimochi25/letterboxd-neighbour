@@ -142,6 +142,16 @@ function App() {
         )}
         {data && (
           <div className="flex flex-col gap-7 w-full">
+            {data.warnings.length > 0 && (
+              <div
+                role="alert"
+                className="w-full max-w-2xl place-self-center rounded border-l-4 border-[#ff8000] bg-[#2c3440] p-4 text-sm"
+              >
+                {data.warnings.map((warning, index) => (
+                  <p key={index}>{warning}</p>
+                ))}
+              </div>
+            )}
             <div className="flex w-full gap-10 flex-col md:flex-row justify-center items-center">
               <div
                 className={cn(
