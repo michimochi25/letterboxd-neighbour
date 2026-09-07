@@ -8,6 +8,7 @@ import { StackedBar } from "./components/StackedBar";
 import { cn } from "./lib/utils";
 import type { Data } from "./types";
 import { DisagreeRow } from "./components/DisagreeRow";
+import { usePostHog } from "@posthog/react";
 import {
   Dialog,
   DialogClose,
@@ -23,6 +24,7 @@ function App() {
   const [data, setData] = useState<Data | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const posthog = usePostHog();
 
   const handleCompare = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -35,6 +37,12 @@ function App() {
     setError("");
     setData(null);
     setLoading(true);
+
+    // Usernames are deliberately never sent: the people being compared are
+    // third parties who never used this app.
+    posthog?.capture("comparison_submitted");
+    const startedAt = performance.now();
+    let status: number | null = null;
 
     try {
       const response = await fetch(
@@ -51,17 +59,34 @@ function App() {
         }
       );
 
+      status = response.status;
+
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.detail || "Comparison failed");
       }
 
-      const realData = await response.json();
+      const realData: Data = await response.json();
       console.log(realData);
       setData(realData);
+      posthog?.capture("comparison_completed", {
+        final_score: realData.metrics.finalScore,
+        taste_match: realData.metrics.tasteMatch,
+        library_overlap: realData.metrics.libraryOverlap,
+        shared_count: realData.metrics.sharedCount,
+        total_watched_1: realData.metrics.totalWatched[0],
+        total_watched_2: realData.metrics.totalWatched[1],
+        controversial_count: realData.controversialMovies.length,
+        duration_ms: Math.round(performance.now() - startedAt),
+      });
     } catch (err: any) {
       console.error(err);
       setError(err.message || "Failed to connect to the server.");
+      posthog?.capture("comparison_failed", {
+        status,
+        reason: err.message || "Failed to connect to the server.",
+        duration_ms: Math.round(performance.now() - startedAt),
+      });
     } finally {
       setLoading(false);
     }
@@ -177,7 +202,11 @@ function App() {
             </div>
 
             {/* How score is calculated info */}
-            <Dialog>
+            <Dialog
+              onOpenChange={(open) => {
+                if (open) posthog?.capture("score_explainer_opened");
+              }}
+            >
               <DialogTrigger asChild>
                 <span className="underline cursor-pointer text-center">
                   How is the score calculated?

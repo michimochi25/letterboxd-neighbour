@@ -20,7 +20,7 @@ pnpm build      # tsc -b && vite build (type errors fail the build)
 pnpm lint       # eslint
 ```
 
-`frontend/.env` is gitignored and required — without `VITE_API_URL=http://localhost:8000` the fetch in `App.tsx` targets `undefined/api/compare`.
+`frontend/.env` is gitignored and required — without `VITE_API_URL=http://localhost:8000` the fetch in `App.tsx` targets `undefined/api/compare`. `VITE_POSTHOG_KEY` and `VITE_POSTHOG_HOST` are optional: `main.tsx` only calls `posthog.init` when the key is set, so analytics no-ops without them.
 
 There is no test suite and no Python linter/formatter configured. `pnpm build` (which type-checks) is the only automated check in the repo.
 

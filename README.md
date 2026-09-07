@@ -55,6 +55,11 @@ pnpm install
 ```
 VITE_API_URL=http://localhost:8000
 ```
+Optionally add PostHog analytics. Without these the app runs normally and sends nothing:
+```
+VITE_POSTHOG_KEY=phc_your_project_key
+VITE_POSTHOG_HOST=https://us.i.posthog.com
+```
 ## 📖Usage
 Run both backend and frontend. 
 ```bash
